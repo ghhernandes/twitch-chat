@@ -78,24 +78,27 @@ class WebSocketConnection:
             if parsed['action'] == 'PING':
                 await self._pong()
             elif parsed['action'] == 'PRIVMSG':
-                self.on_receive_message(parsed['user'], parsed['message'])
+                self.on_receive_message(parsed['channel'], parsed['user'], parsed['message'])
 
-    def on_receive_message(self, user, message):
-        print(f"{user}: {message}")
+    def on_receive_message(self, channel, user, message):
+        print(f"#{channel} {user}: {message}")
           
     def _parser(self, data):
         groups = data.rsplit()
         action = groups[1]
 
+        channel = None
         user = None
         message = None
 
         if action in ('PRIVMSG'):
+            channel = ''
             user = re.search(REGX_USER, groups[0]).group('user')
             message = " ".join(groups[3:]).lstrip(':')
             
         return dict(
             action = action,
+            channel = channel,
             user = user,
             message = message
         )
