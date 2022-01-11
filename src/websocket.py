@@ -1,4 +1,3 @@
-import asyncio
 import re
 import time
 
@@ -20,7 +19,7 @@ class WebSocketConnection:
 
     async def connect(self) -> None:
         self._websocket = None
-        
+
         if self.is_alive:
             self.close()
         try:
@@ -46,18 +45,18 @@ class WebSocketConnection:
             print('Connection closed.')
 
 
-    async def _send(self, msg: str) -> None:
+    async def send(self, msg: str) -> None:
         await self._websocket.send(f"{msg}\r\n")
     
 
     async def _pong(self, _=None):
         self._last_ping = time.time()
-        await self._send("PONG :tmi.twitch.tv\r\n")        
+        await self.send("PONG :tmi.twitch.tv\r\n")        
 
 
     async def authenticate(self):
-        await self._send(f"PASS {self.oauth_token}")
-        await self._send(f"NICK {self.bot_username}")
+        await self.send(f"PASS {self.oauth_token}")
+        await self.send(f"NICK {self.bot_username}")
         
 
     async def join_channels(self, *channels: str):
@@ -67,7 +66,7 @@ class WebSocketConnection:
 
 
     async def _join_channel(self, channel: str):
-        await self._send(f"JOIN #{channel}")
+        await self.send(f"JOIN #{channel}")
 
 
     async def _keep_alive(self) -> None:
@@ -76,11 +75,13 @@ class WebSocketConnection:
             data = await self._websocket.recv()
             parsed = self._parser(data)
 
-            # TODO: refactor this shit
             if parsed['action'] == 'PING':
                 await self._pong()
             elif parsed['action'] == 'PRIVMSG':
-                print(f"{parsed['user']} : {parsed['message']}")
+                self.on_receive_message(parsed['user'], parsed['message'])
+
+    def on_receive_message(self, user, message):
+        print(f"{user}: {message}")
           
     def _parser(self, data):
         groups = data.rsplit()
