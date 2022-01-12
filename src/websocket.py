@@ -2,20 +2,26 @@ import re
 import time
 
 from websockets import connect
-from dataclasses import dataclass
 
 REGX_USER = re.compile(r":(?P<user>.*)!")
 
-@dataclass
 class WebSocketConnection:
-    bot_username: str
-    channel_name: str
-    oauth_token: str
-            
+    
+    def __init__(
+        self, 
+        bot_username: str,
+        channel_name: str, 
+        oauth_token: str,
+        client = None
+        ) -> None:
+        self.bot_username = bot_username
+        self.channel_name = channel_name
+        self.oauth_token = oauth_token
+        self._client = client
+
     @property
     def is_alive(self) -> bool:
         return self._websocket is not None and not self._websocket.closed
-
 
     async def connect(self) -> None:
         self._websocket = None
@@ -25,18 +31,17 @@ class WebSocketConnection:
         try:
             print("Connecting...")
             self._websocket = await connect("wss://irc-ws.chat.twitch.tv:443")
-                        
+
             await self.authenticate()
 
-            #await self.join_channels([self.channel_name])
+            # await self.join_channels([self.channel_name])
 
             await self._join_channel(self.channel_name)
 
             print('Connected.')
             await self._keep_alive()
         except:
-            await self.close()                    
-         
+            await self.close()
 
     async def close(self) -> None:
         if self.is_alive:
@@ -44,30 +49,24 @@ class WebSocketConnection:
             await self._websocket.wait_closed()
             print('Connection closed.')
 
-
     async def send(self, msg: str) -> None:
         await self._websocket.send(f"{msg}\r\n")
-    
 
     async def _pong(self, _=None):
         self._last_ping = time.time()
-        await self.send("PONG :tmi.twitch.tv\r\n")        
-
+        await self.send("PONG :tmi.twitch.tv\r\n")
 
     async def authenticate(self):
         await self.send(f"PASS {self.oauth_token}")
         await self.send(f"NICK {self.bot_username}")
-        
 
     async def join_channels(self, *channels: str):
         for ch in channels:
             # TODO: create asyncio tasks for join in multiple channels (use lock to connect one at once)
             await self._join_channel(ch)
 
-
     async def _join_channel(self, channel: str):
         await self.send(f"JOIN #{channel}")
-
 
     async def _keep_alive(self) -> None:
         print('keeping alive.')
@@ -82,7 +81,7 @@ class WebSocketConnection:
 
     def on_receive_message(self, channel, user, message):
         print(f"#{channel} {user}: {message}")
-          
+
     def _parser(self, data):
         groups = data.rsplit()
         action = groups[1]
@@ -95,10 +94,10 @@ class WebSocketConnection:
             channel = ''
             user = re.search(REGX_USER, groups[0]).group('user')
             message = " ".join(groups[3:]).lstrip(':')
-            
+
         return dict(
-            action = action,
-            channel = channel,
-            user = user,
-            message = message
+            action=action,
+            channel=channel,
+            user=user,
+            message=message
         )
