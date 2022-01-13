@@ -9,6 +9,7 @@ from .message import Message
 from .user import User
 from .channel import Channel
 from .context import Context
+from .exceptions import SocketConnectError, SendMessageError, JoinChannelError, ParseDataError
 
 REGX_USER = re.compile(r":(?P<user>.*)!")
 
@@ -55,20 +56,24 @@ class WebSocketConnection:
 
             await self._join_channel(self.channel_name)
 
-            #self.dispatch('connect')
+            await self.dispatch('connect')
 
-            await self._keep_alive()
-        except:
+            self._loop.create_task(self._keep_alive())
+        except Exception as e:
             await self.close()
+            raise SocketConnectError('Socket connection error', e)
 
     async def close(self) -> None:
         if self.is_alive:
             await self._websocket.close()
             await self._websocket.wait_closed()
-            print('Connection closed.')
-
+            await self.dispatch('disconnect')
+            
     async def send(self, msg: str) -> None:
-        await self._websocket.send(f"{msg}\r\n")
+        try:
+            await self._websocket.send(f"{msg}\r\n")
+        except Exception as e:
+            raise SendMessageError('Send message error', e)
 
     async def authenticate(self):
         await self.send(f"PASS {self.oauth_token}")
@@ -80,7 +85,10 @@ class WebSocketConnection:
             await self._join_channel(ch)
 
     async def _join_channel(self, channel: str):
-        await self.send(f"JOIN #{channel}")
+        try:
+            await self.send(f"JOIN #{channel}")
+        except Exception as e:
+            raise JoinChannelError('Join channel error', e)
 
     async def _keep_alive(self) -> None:
         log.debug('Keeping alive')
@@ -116,21 +124,24 @@ class WebSocketConnection:
             await self._actions[action](parsed)
         
     def _parser(self, data):
-        groups = data.rsplit()
-        action = groups[1]
+        try:
+            groups = data.rsplit()
+            action = groups[1]
 
-        channel = None
-        user = None
-        message = None
+            channel = None
+            user = None
+            message = None
 
-        if action in ('PRIVMSG'):
-            channel = ''
-            user = re.search(REGX_USER, groups[0]).group('user')
-            message = " ".join(groups[3:]).lstrip(':')
+            if action in ('PRIVMSG'):
+                channel = ''
+                user = re.search(REGX_USER, groups[0]).group('user')
+                message = " ".join(groups[3:]).lstrip(':')
 
-        return dict(
-            action=action,
-            channel=channel,
-            user=user,
-            message=message
-        )
+            return dict(
+                action=action,
+                channel=channel,
+                user=user,
+                message=message
+            )
+        except Exception as e:
+            raise ParseDataError('Parse data error', e)

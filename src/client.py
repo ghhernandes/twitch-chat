@@ -11,7 +11,7 @@ class Client:
         self.username = username
         self.channel = channel
         self.oauth = oauth
-        self.events = {
+        self._events = {
             'message': None
         }
 
@@ -39,9 +39,9 @@ class Client:
         return decorate
 
     def _add_event(self, event: str, func):
-        if event not in self.events:
+        if event not in self._events:
             raise EventNotExistError("Event not exists.")
-        self.events[event] = func
+        self._events[event] = func
 
     async def connect(self) -> None:
         await self._connection.connect()
@@ -53,5 +53,5 @@ class Client:
         await self._connection.send(f'PRIVMSG {message.text}')
 
     async def run_event(self, event: str, ctx: Context) -> None:
-        if event in self.events:
-            self.loop.create_task(self.events[event](ctx))
+        if event in self._events:
+            self.loop.create_task(self._events[event](ctx))
