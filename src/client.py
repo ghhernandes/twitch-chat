@@ -1,18 +1,19 @@
 import asyncio
-from asyncio import events
 
 from src.context import Context
 
 from .websocket import WebSocketConnection
 from .message import Message
-
+from .exceptions import EventNotExistError
 
 class Client:
     def __init__(self, username: str, channel: str, oauth: str) -> None:
         self.username = username
         self.channel = channel
         self.oauth = oauth
-        self.events = {}
+        self.events = {
+            'message': None
+        }
 
     def run(self) -> None:
         self.loop = asyncio.get_event_loop()
@@ -38,8 +39,9 @@ class Client:
         return decorate
 
     def _add_event(self, event: str, func):
-        if not event in self.events:
-            self.events[event] = func
+        if event not in self.events:
+            raise EventNotExistError("Event not exists.")
+        self.events[event] = func
 
     async def connect(self) -> None:
         await self._connection.connect()

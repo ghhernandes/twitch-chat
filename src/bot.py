@@ -1,6 +1,7 @@
 
 from .client import Client
 from .context import Context
+from .exceptions import CommandExistsError
 
 class Bot(Client):
     def __init__(self, username: str, channel: str, oauth: str) -> None:
@@ -13,8 +14,10 @@ class Bot(Client):
         return decorate
 
     def _add_command(self, command: str, func):
-        if not command in self.commands:
+        if command not in self.commands:
             self.commands[command] = func
+        else:
+            raise CommandExistsError("Command added before.")
 
     async def run_event(self, event: str, ctx: Context) -> None:
         if event == 'message':
