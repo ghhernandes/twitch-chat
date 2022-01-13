@@ -1,23 +1,40 @@
+import asyncio
 import re
 import time
+import logging
 
 from websockets import connect
 
+from .message import Message
+from .user import User
+from .channel import Channel
+from .context import Context
+
 REGX_USER = re.compile(r":(?P<user>.*)!")
 
-class WebSocketConnection:
-    
+log = logging.getLogger(__name__)
+
+
+class WebSocketConnection:    
     def __init__(
         self, 
         bot_username: str,
         channel_name: str, 
         oauth_token: str,
-        client = None
-        ) -> None:
+        client = None,
+        loop = None
+    ) -> None:
+
         self.bot_username = bot_username
         self.channel_name = channel_name
         self.oauth_token = oauth_token
         self._client = client
+        self._loop = loop
+        self.host = "wss://irc-ws.chat.twitch.tv:443"
+        self._actions = {
+            'PING': self._pong,
+            'PRIVMSG': self._privmsg
+        }
 
     @property
     def is_alive(self) -> bool:
@@ -29,8 +46,8 @@ class WebSocketConnection:
         if self.is_alive:
             self.close()
         try:
-            print("Connecting...")
-            self._websocket = await connect("wss://irc-ws.chat.twitch.tv:443")
+            log.debug('Connecting...')
+            self._websocket = await connect(self.host)
 
             await self.authenticate()
 
@@ -38,7 +55,8 @@ class WebSocketConnection:
 
             await self._join_channel(self.channel_name)
 
-            print('Connected.')
+            #self.dispatch('connect')
+
             await self._keep_alive()
         except:
             await self.close()
@@ -51,10 +69,6 @@ class WebSocketConnection:
 
     async def send(self, msg: str) -> None:
         await self._websocket.send(f"{msg}\r\n")
-
-    async def _pong(self, _=None):
-        self._last_ping = time.time()
-        await self.send("PONG :tmi.twitch.tv\r\n")
 
     async def authenticate(self):
         await self.send(f"PASS {self.oauth_token}")
@@ -69,19 +83,38 @@ class WebSocketConnection:
         await self.send(f"JOIN #{channel}")
 
     async def _keep_alive(self) -> None:
-        print('keeping alive.')
+        log.debug('Keeping alive')
         while self.is_alive:
             data = await self._websocket.recv()
-            parsed = self._parser(data)
+            if data:
+                parsed = self._parser(data)
+                self._loop.create_task(self._process_data(parsed))
 
-            if parsed['action'] == 'PING':
-                await self._pong()
-            elif parsed['action'] == 'PRIVMSG':
-                self.on_receive_message(parsed['channel'], parsed['user'], parsed['message'])
+    async def dispatch(self, event: str, **kwargs):
+        log.debug(f"Dispatching event {event}")
+        ctx = Context(**kwargs)
+        await self._client.run_event(event, ctx)
 
-    def on_receive_message(self, channel, user, message):
-        print(f"#{channel} {user}: {message}")
+    async def _pong(self, _=None):
+        self._last_ping = time.time()
+        await self.send("PONG :tmi.twitch.tv\r\n")
 
+    async def _privmsg(self, data):
+        user = User(username=data['user'])
+        channel = Channel(name=data['channel'])
+        message = Message(
+            raw_data=data, 
+            channel=channel,
+            user=user,
+            text=data['message']
+            )
+        await self.dispatch('message', message=message)
+
+    async def _process_data(self, parsed):
+        action = parsed['action']
+        if action in self._actions:
+            await self._actions[action](parsed)
+        
     def _parser(self, data):
         groups = data.rsplit()
         action = groups[1]

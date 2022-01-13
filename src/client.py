@@ -1,6 +1,8 @@
 import asyncio
+from asyncio import events
 
-from .events import EventHandler
+from src.context import Context
+
 from .websocket import WebSocketConnection
 from .message import Message
 
@@ -10,11 +12,17 @@ class Client:
         self.username = username
         self.channel = channel
         self.oauth = oauth
+        self.events = {}
 
     def run(self) -> None:
-        self.connection = WebSocketConnection(self.username, self.channel, self.oauth, client=self)
-        self.event_handler = EventHandler()
         self.loop = asyncio.get_event_loop()
+        self._connection = WebSocketConnection(
+            bot_username=self.username, 
+            channel_name=self.channel, 
+            oauth_token=self.oauth, 
+            client=self, 
+            loop=self.loop)        
+
         try:
             self.loop.create_task(self.connect())
             self.loop.run_forever()
@@ -24,14 +32,24 @@ class Client:
             self.loop.run_until_complete(self.close())
             self.loop.close()
 
+    def event(self, command):
+        def decorate(fn):
+            self._add_event(command, fn)            
+        return decorate
+
+    def _add_event(self, event: str, func):
+        if not event in self.events:
+            self.events[event] = func
+
     async def connect(self) -> None:
-        await self.connection.connect()
+        await self._connection.connect()
 
     async def close(self) -> None:
-        await self.connection.close()
+        await self._connection.close()
 
     async def send(self, message: Message) -> None:
-        await self.connection.send(f'PRIVMSG {message.text}')
+        await self._connection.send(f'PRIVMSG {message.text}')
 
-    async def run_event(self, event, *args, **kwargs) -> None:
-        pass
+    async def run_event(self, event: str, ctx: Context) -> None:
+        if event in self.events:
+            self.loop.create_task(self.events[event](ctx))

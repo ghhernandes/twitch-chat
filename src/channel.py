@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
 @dataclass
-class User:
-    username: str
-
+class Channel:
+    name: str
