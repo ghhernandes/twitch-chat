@@ -3,7 +3,7 @@ import re
 import time
 import logging
 
-from websockets import connect
+from websockets import connect, ConnectionClosedError, ConnectionClosedOK
 
 from .message import Message
 from .user import User
@@ -31,21 +31,22 @@ class WebSocketConnection:
         self.oauth_token = oauth_token
         self._client = client
         self._loop = loop
+        self._websocket = None
         self.host = "wss://irc-ws.chat.twitch.tv:443"
         self._actions = {
             'PING': self._pong,
             'PRIVMSG': self._privmsg
         }
+        if self._loop is None:
+            self._loop = asyncio.get_event_loop()
 
     @property
     def is_alive(self) -> bool:
         return self._websocket is not None and not self._websocket.closed
 
     async def connect(self) -> None:
-        self._websocket = None
-
         if self.is_alive:
-            self.close()
+            await self.close()
         try:
             log.debug('Connecting...')
             self._websocket = await connect(self.host)
@@ -56,7 +57,7 @@ class WebSocketConnection:
 
             await self._join_channel(self.channel_name)
 
-            await self.dispatch('connect')
+            self._loop.create_task(self.dispatch('connect'))
 
             self._loop.create_task(self._keep_alive())
         except Exception as e:
@@ -67,7 +68,8 @@ class WebSocketConnection:
         if self.is_alive:
             await self._websocket.close()
             await self._websocket.wait_closed()
-            await self.dispatch('disconnect')
+            self._websocket = None
+            self._loop.create_task(self.dispatch('close'))          
             
     async def send(self, msg: str) -> None:
         try:
@@ -92,11 +94,16 @@ class WebSocketConnection:
 
     async def _keep_alive(self) -> None:
         log.debug('Keeping alive')
-        while self.is_alive:
-            data = await self._websocket.recv()
-            if data:
-                parsed = self._parser(data)
-                self._loop.create_task(self._process_data(parsed))
+        try:
+            while self.is_alive:
+                data = await self._websocket.recv()
+                if data:
+                    parsed = self._parser(data)
+                    self._loop.create_task(self._process_data(parsed))
+        except ConnectionClosedOK:
+            pass
+        except ConnectionClosedError:
+            self._loop.create_task(self.connect())        
 
     async def dispatch(self, event: str, **kwargs):
         log.debug(f"Dispatching event {event}")

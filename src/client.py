@@ -12,7 +12,9 @@ class Client:
         self.channel = channel
         self.oauth = oauth
         self._events = {
-            'message': None
+            'message': None,
+            'connect': None,
+            'close': None,
         }
 
     def run(self) -> None:
@@ -47,11 +49,11 @@ class Client:
         await self._connection.connect()
 
     async def close(self) -> None:
-        await self._connection.close()
+        await self._connection.close()      
 
     async def send(self, message: Message) -> None:
         await self._connection.send(f'PRIVMSG {message.text}')
 
     async def run_event(self, event: str, ctx: Context) -> None:
         if event in self._events:
-            self.loop.create_task(self._events[event](ctx))
+            await self._events[event](ctx)
