@@ -9,26 +9,26 @@ from .message import Message
 from .user import User
 from .channel import Channel
 from .context import Context
-from .exceptions import SocketConnectError, SendMessageError, JoinChannelError, ParseDataError
+from .exceptions import SocketConnectError, SendMessageError, JoinChannelError, ParseDataError, ChannelLimitExceededError
 
 REGX_USER = re.compile(r":(?P<user>.*)!")
 
-log = logging.getLogger(__name__)
+MAX_CHANNEL_JOIN = 5
 
+log = logging.getLogger(__name__)
 
 class WebSocketConnection:    
     def __init__(
         self, 
         bot_username: str,
-        channel_name: str, 
         oauth_token: str,
+        channels: list,
         client = None,
         loop = None
     ) -> None:
-
         self.bot_username = bot_username
-        self.channel_name = channel_name
         self.oauth_token = oauth_token
+        self.channels = channels
         self._client = client
         self._loop = loop
         self._websocket = None
@@ -52,13 +52,11 @@ class WebSocketConnection:
             self._websocket = await connect(self.host)
 
             await self.authenticate()
-
-            # await self.join_channels([self.channel_name])
-
-            await self._join_channel(self.channel_name)
-
+            
             self._loop.create_task(self.dispatch('connect'))
 
+            self._loop.create_task(self._join_channels(self.channels))
+            
             self._loop.create_task(self._keep_alive())
         except Exception as e:
             await self.close()
@@ -81,19 +79,27 @@ class WebSocketConnection:
         await self.send(f"PASS {self.oauth_token}")
         await self.send(f"NICK {self.bot_username}")
 
-    async def join_channels(self, *channels: str):
+    async def _join_channels(self, channels):
         for ch in channels:
-            # TODO: create asyncio tasks for join in multiple channels (use lock to connect one at once)
-            await self._join_channel(ch)
+            await self.join_channel(ch)
 
-    async def _join_channel(self, channel: str):
+    async def join_channel(self, channel: str):
         try:
+            if len(self.channels) > MAX_CHANNEL_JOIN:
+                raise ChannelLimitExceededError('Max Channels joined limit exceeded.')
             await self.send(f"JOIN #{channel}")
+            await self.dispatch('join', channel=channel)
         except Exception as e:
+            self.channels.remove(channel)
             raise JoinChannelError('Join channel error', e)
 
+    async def leave_channel(self, channel: str):
+        if channel in self.channels:
+            await self.send(f"PART #{channel}")
+            self.channels.remove(channel)
+            await self.dispatch('part', channel=channel)            
+        
     async def _keep_alive(self) -> None:
-        log.debug('Keeping alive')
         try:
             while self.is_alive:
                 data = await self._websocket.recv()
@@ -113,6 +119,7 @@ class WebSocketConnection:
     async def _pong(self, _=None):
         self._last_ping = time.time()
         await self.send("PONG :tmi.twitch.tv\r\n")
+        await self.dispatch('ping', last=self._last_ping)
 
     async def _privmsg(self, data):
         user = User(username=data['user'])
@@ -130,20 +137,21 @@ class WebSocketConnection:
         if action in self._actions:
             await self._actions[action](parsed)
         
-    def _parser(self, data):
+    def _parser(self, data: str):
+        log.debug(data)
         try:
             groups = data.rsplit()
-            action = groups[1]
+            action = 'PING' if data.startswith('PING') else groups[1]
 
             channel = None
             user = None
             message = None
 
             if action in ('PRIVMSG'):
-                channel = ''
                 user = re.search(REGX_USER, groups[0]).group('user')
+                channel = groups[2]
                 message = " ".join(groups[3:]).lstrip(':')
-
+            
             return dict(
                 action=action,
                 channel=channel,

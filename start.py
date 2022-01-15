@@ -7,19 +7,23 @@ from src.bot import Bot
 load_dotenv()
 
 BOT_USERNAME = os.getenv('BOT_USERNAME')
-CHANNEL_NAME = os.getenv('CHANNEL_NAME')
 OAUTH_TOKEN = os.getenv('OAUTH_TOKEN')
+CHANNEL = os.getenv('CHANNEL')
 
-client = Bot(BOT_USERNAME, CHANNEL_NAME, OAUTH_TOKEN)
+client = Bot(BOT_USERNAME, [CHANNEL], OAUTH_TOKEN)
 console = Console()
 
 @client.event('message')
 async def on_message(ctx):
-    console.print(f"[bold cyan]{ctx.message.user.username}:[/bold cyan] {ctx.message.text}")
+    console.print(f"[bold blue]{ctx.message.channel.name:<15}[/bold blue] [bold cyan]{ctx.message.user.username}:[/bold cyan] {ctx.message.text}")
 
 @client.event('connect')
 async def on_connect(ctx):
     console.print('[bold green]Connected![/bold green]')
+
+@client.event('ping')
+async def on_ping(ctx):
+    console.print(f'[bold orange]PING from server. (Last: {ctx.last})[/bold orange]')
 
 @client.event('close')
 async def on_close(ctx):

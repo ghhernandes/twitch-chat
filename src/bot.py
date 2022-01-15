@@ -4,8 +4,8 @@ from .context import Context
 from .exceptions import CommandExistsError
 
 class Bot(Client):
-    def __init__(self, username: str, channel: str, oauth: str) -> None:
-        super().__init__(username, channel, oauth)
+    def __init__(self, username: str, channels: list, oauth: str) -> None:
+        super().__init__(username, channels, oauth)
         self._commands = {}
  
     def command(self, command):

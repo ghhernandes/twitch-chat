@@ -1,39 +1,43 @@
 import asyncio
-
-from src.context import Context
-
+import logging
 from .websocket import WebSocketConnection
 from .message import Message
+from .context import Context
 from .exceptions import EventNotExistError
 
 class Client:
-    def __init__(self, username: str, channel: str, oauth: str) -> None:
+    def __init__(self, username: str, channels: list, oauth: str) -> None:
         self.username = username
-        self.channel = channel
+        self.channels = channels
         self.oauth = oauth
         self._events = {
             'message': None,
             'connect': None,
             'close': None,
+            'ping': None,
         }
 
     def run(self) -> None:
         self.loop = asyncio.get_event_loop()
         self._connection = WebSocketConnection(
             bot_username=self.username, 
-            channel_name=self.channel, 
             oauth_token=self.oauth, 
+            channels=self.channels,
             client=self, 
             loop=self.loop)        
 
         try:
             self.loop.create_task(self.connect())
             self.loop.run_forever()
+            logging.debug("Connected")
         except KeyboardInterrupt:
             pass
         finally:
             self.loop.run_until_complete(self.close())
             self.loop.close()
+
+    def reply(self, channel, message: str) -> None:
+        self.loop.create_task(self.send(f'PRIVMSG #{channel} :{message}'))
 
     def event(self, command):
         def decorate(fn):

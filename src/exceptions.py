@@ -17,3 +17,6 @@ class SocketConnectError(Exception):
 
 class ParseDataError(Exception):
     pass
+
+class ChannelLimitExceededError(Exception):
+    pass
