@@ -15,7 +15,7 @@ console = Console()
 
 @client.event('message')
 async def on_message(ctx):
-    console.print(f"[bold blue]{ctx.message.channel.name:<15}[/bold blue] [bold cyan]{ctx.message.user.username}:[/bold cyan] {ctx.message.text}")
+    console.print(f"[bold blue]{ctx.message.channel.name}[/bold blue] [bold cyan]{ctx.message.user.username}:[/bold cyan] {ctx.message.text}")
 
 @client.event('connect')
 async def on_connect(ctx):
@@ -23,7 +23,7 @@ async def on_connect(ctx):
 
 @client.event('ping')
 async def on_ping(ctx):
-    console.print(f'[bold orange]PING from server. (Last: {ctx.last})[/bold orange]')
+    console.print(f'[bold red]PING from server. (Last: {ctx.last})[/bold red]')
 
 @client.event('close')
 async def on_close(ctx):
