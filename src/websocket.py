@@ -144,9 +144,9 @@ class WebSocketConnection:
             groups = data.rsplit()
             action = 'PING' if data.startswith('PING') else groups[1]
 
-            channel = None
-            user = None
-            message = None
+            channel: str = None
+            user: str = None
+            message: str = None
 
             if action in ('PRIVMSG'):
                 user = re.search(REGX_USER, groups[0]).group('user')

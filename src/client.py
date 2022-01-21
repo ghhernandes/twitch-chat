@@ -6,7 +6,7 @@ from .context import Context
 from .exceptions import EventNotExistError
 
 class Client:
-    def __init__(self, username: str, channels: list, oauth: str) -> None:
+    def __init__(self, username: str, channels: list[str], oauth: str) -> None:
         self.username = username
         self.channels = channels
         self.oauth = oauth
