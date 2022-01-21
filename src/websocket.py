@@ -4,6 +4,7 @@ import time
 import logging
 
 from websockets import connect, ConnectionClosedError, ConnectionClosedOK
+from typing import Any
 
 from .message import Message
 from .user import User
@@ -22,16 +23,16 @@ class WebSocketConnection:
         self, 
         bot_username: str,
         oauth_token: str,
-        channels: list,
-        client = None,
-        loop = None
+        channels: list[str],
+        client: Any = None,
+        loop: asyncio.AbstractEventLoop = None
     ) -> None:
         self.bot_username = bot_username
         self.oauth_token = oauth_token
         self.channels = channels
         self._client = client
         self._loop = loop
-        self._websocket = None
+        self._websocket: Any = None
         self.host = "wss://irc-ws.chat.twitch.tv:443"
         self._actions = {
             'PING': self._pong,
@@ -143,9 +144,9 @@ class WebSocketConnection:
             groups = data.rsplit()
             action = 'PING' if data.startswith('PING') else groups[1]
 
-            channel = None
-            user = None
-            message = None
+            channel: str = None
+            user: str = None
+            message: str = None
 
             if action in ('PRIVMSG'):
                 user = re.search(REGX_USER, groups[0]).group('user')
