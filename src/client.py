@@ -1,5 +1,9 @@
 import asyncio
 import logging
+from pydoc import text
+
+from src.channel import Channel
+from src.user import User
 from .websocket import WebSocketConnection
 from .message import Message
 from .context import Context
@@ -37,7 +41,10 @@ class Client:
             self.loop.close()
 
     def reply(self, channel, message: str) -> None:
-        self.loop.create_task(self.send(f'PRIVMSG #{channel} :{message}'))
+        channel = Channel(name=channel)
+        user = User(username=self.username)
+        message = Message(raw_data=None, channel=channel, user=user, text=message)
+        self.loop.create_task(self.send(message))
 
     def event(self, command):
         def decorate(fn):
@@ -56,7 +63,7 @@ class Client:
         await self._connection.close()      
 
     async def send(self, message: Message) -> None:
-        await self._connection.send(f'PRIVMSG {message.text}')
+        await self._connection.send(f'PRIVMSG {message.channel.name} :{message.text}')
 
     async def run_event(self, event: str, ctx: Context) -> None:
         if event in self._events:

@@ -29,9 +29,9 @@ async def on_ping(ctx):
 async def on_close(ctx):
     console.print('[bold red]Connection closed.[/bold red]')    
 
-@client.command('!close')
+@client.command('!hello')
 async def command_close(ctx):
-    await client.close()
+    client.reply(ctx.message.channel.name, f'Hello @{ctx.message.user.username}!')
 
 if __name__ == '__main__':
     client.run()    
