@@ -24,6 +24,10 @@ async def on_message(ctx):
 async def help_command(ctx):
     print(f"{ctx.message.user.username} used command !help")
 
+@client.command('!hello')
+async def command_close(ctx):
+    client.reply(ctx.message.channel.name, f'Hello @{ctx.message.user.username}!')
+
 if __name__ == '__main__':
     client.run()
 ```
