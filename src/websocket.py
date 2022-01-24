@@ -120,7 +120,7 @@ class WebSocketConnection:
     async def _pong(self, _=None):
         self._last_ping = time.time()
         await self.send("PONG :tmi.twitch.tv\r\n")
-        await self.dispatch('ping', last=self._last_ping)
+        await self.dispatch('ping', last_ping=self._last_ping)
 
     async def _privmsg(self, data):
         user = User(username=data['user'])
