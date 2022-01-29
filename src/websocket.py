@@ -2,6 +2,7 @@ import asyncio
 import re
 import time
 import logging
+import abc
 
 from websockets import connect, ConnectionClosedError, ConnectionClosedOK
 from typing import Any
@@ -18,7 +19,21 @@ MAX_CHANNEL_JOIN = 5
 
 log = logging.getLogger(__name__)
 
-class WebSocketConnection:    
+class Connection(abc.ABC):
+    @abc.abstractmethod
+    async def connect(self) -> None:
+        pass
+    @abc.abstractmethod
+    async def close(self) -> None:
+        pass
+    @abc.abstractmethod
+    async def authenticate(self):
+        pass
+    @abc.abstractmethod
+    async def send(self, msg: str) -> None:
+        pass
+
+class WebSocketConnection(Connection):
     def __init__(
         self, 
         bot_username: str,

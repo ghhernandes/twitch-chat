@@ -4,7 +4,7 @@ from pydoc import text
 
 from src.channel import Channel
 from src.user import User
-from .websocket import WebSocketConnection
+from .websocket import Connection, WebSocketConnection
 from .message import Message
 from .context import Context
 from .exceptions import EventNotExistError
@@ -14,6 +14,7 @@ class Client:
         self.username = username
         self.channels = channels
         self.oauth = oauth
+        self._connection: Connection = None
         self._events = {
             'message': None,
             'connect': None,
